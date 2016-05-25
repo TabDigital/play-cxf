@@ -1,4 +1,6 @@
-import play.core.PlayVersion
+import play.core._
+import sbt.Keys._
+
 
 val playVersionSuffix: String = {
   val versions = PlayVersion.current.split('.')
@@ -14,11 +16,9 @@ organizationName := "iMind"
 
 organizationHomepage := Some(url("http://imind.eu/"))
 
-version := "1.2.1"
+version := "1.2.2-SNAPSHOT"
 
-crossScalaVersions := Seq("2.10.5", "2.11.7")
-
-libraryDependencies += "org.springframework" % "spring-context" % "[4.1.6.RELEASE,)"
+scalaVersion := "2.11.8"
 
 libraryDependencies += "org.apache.cxf" % "cxf-core" % "3.1.2"
 

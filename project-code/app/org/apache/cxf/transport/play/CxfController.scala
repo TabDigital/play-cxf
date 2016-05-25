@@ -1,9 +1,10 @@
 package org.apache.cxf.transport.play
 
 import java.io.{ByteArrayInputStream, InputStream, OutputStream}
+import javax.inject.Inject
 
-import org.apache.cxf.message.{MessageImpl, Message}
-
+import akka.util.ByteString
+import org.apache.cxf.message.{Message, MessageImpl}
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Enumerator
 import play.api.mvc._
@@ -11,7 +12,7 @@ import play.api.mvc._
 import scala.concurrent.Promise
 import scala.collection.JavaConverters._
 
-class CxfController extends Controller {
+class CxfController @Inject()(transportFactory: PlayTransportFactory) extends Controller {
 
   val maxRequestSize = 1024 * 1024
 
@@ -24,9 +25,7 @@ class CxfController extends Controller {
       delayedOutput.setTarget(os)
     }
     replyPromise.future.map { outMessage =>
-      Ok.chunked(resultEnumerator >>> Enumerator.eof) withHeaders(
-        Message.CONTENT_TYPE -> outMessage.get(Message.CONTENT_TYPE).asInstanceOf[String]
-      )
+      Ok.chunked(resultEnumerator >>> Enumerator.eof).as(outMessage.get(Message.CONTENT_TYPE).asInstanceOf[String])
     }
   }
 
@@ -40,8 +39,8 @@ class CxfController extends Controller {
     msg.put(Message.ACCEPT_CONTENT_TYPE, request.headers.get(Message.ACCEPT_CONTENT_TYPE) getOrElse null)
     msg.put("Remote-Address", request.remoteAddress)
 
-    request.body.asBytes() foreach { arr: Array[Byte] =>
-      msg.setContent(classOf[InputStream], new ByteArrayInputStream(arr))
+    request.body.asBytes() foreach { arr: ByteString =>
+      msg.setContent(classOf[InputStream], new ByteArrayInputStream(arr.toArray))
     }
 
     msg
@@ -59,7 +58,6 @@ class CxfController extends Controller {
                               replyPromise: Promise[Message])
                              (implicit request: Request[RawBuffer]) {
 
-    val transportFactory = CxfController.transportFactory
     val dOpt = Option(transportFactory.getDestination(endpointAddress)).orElse(
         Option(transportFactory.getDestination(request.path)))
     dOpt match {
@@ -71,24 +69,6 @@ class CxfController extends Controller {
         replyPromise.failure(new IllegalArgumentException("Destination not found: [" + endpointAddress +
           "] " + transportFactory.getDestinationsDebugInfo))
     }
-  }
-
-}
-
-object CxfController extends CxfController {
-
-  /**
-   * Factory method for Spring.
-   */
-  def getInstance() = this
-
-  /**
-   * Apache CXF transport factory, set by Spring.
-   */
-  var transportFactory: PlayTransportFactory = null
-
-  def setTransportFactory(factory: PlayTransportFactory) {
-    this.transportFactory = factory
   }
 
 }
